@@ -152,6 +152,8 @@ exports.services = function(output) {
         });
 
     //This code will handle non-english OS's
+    var types = ["KERNEL_DRIVER", "FILE_SYSTEM_DRIVER", "WIN32_OWN_PROCESS", "WIN32_SHARE_PROCESS", "INTERACTIVE_PROCESS"];
+    var states = ["STOPPED", "START_PENDING", "STOP_PENDING", "RUNNING", "CONTINUE_PENDING", "PAUSE_PENDING", "PAUSED"];
     if (services.length === 0){
         services = [];
         output =  output.split(/\r?\n\r?\n/).filter(function(output) { return /PID/.test(output); });
@@ -163,39 +165,41 @@ exports.services = function(output) {
                 var line = outLines[0].split(":");
                 service.name = line[1].trim();
             }
-            if (outLines.length > 1){
-                var line = outLines[1].split(":");
-                var lineVal = line[1].split(" ");
-                for (var i = 0 ; i < lineVal.length ; i++){
-                    if (lineVal[i].trim().length === 0){
-                        lineVal.splice(i, 1);
-                    }
-                }
-                service.type =  {};
-                service.type.code = lineVal[0].trim();
-                service.type.name = lineVal[1].trim();
-            }
-            if (outLines.length > 2){
-                var line = outLines[2].split(":");
-                var lineVal = line[1].split(" ");
-                for (var i = 0 ; i < lineVal.length ; i++){
-                    if (lineVal[i].trim().length === 0){
-                        lineVal.splice(i, 1);
-                    }
-                }
-                service.state =  {};
-                service.state.code = lineVal[0].trim();
-                service.state.name = lineVal[1].trim();
-                service.state.running =  service.state.code === '4';
-                service.state.paused =  service.state.code === '7';
-                service.state.stopped =  service.state.code === '1';
-            }
             for(var line in outLines) {
                 var l = line.split(":");
                 if (l.length > 0 && l[0].toLowerCase() === 'PID') {
                     pid = l[1].trim();
                     break;
                 }
+                for (var type in types){
+                    if (l[1].trim().indexOf(type) !== -1){
+                        var lineVal = l[1].split(" ");
+                        for (var i = 0 ; i < lineVal.length ; i++){
+                            if (lineVal[i].trim().length === 0){
+                                lineVal.splice(i, 1);
+                            }
+                        }
+                        service.type =  {};
+                        service.type.code = lineVal[0].trim();
+                        service.type.name = lineVal[1].trim();
+                        break;
+                    }
+                }
+                for (var state in states){
+                    if (l[1].trim().indexOf(state) !== -1){
+                        var lineVal = l[1].split(" ");
+                        for (var i = 0 ; i < lineVal.length ; i++){
+                            if (lineVal[i].trim().length === 0){
+                                lineVal.splice(i, 1);
+                            }
+                        }
+                        service.type =  {};
+                        service.type.code = lineVal[0].trim();
+                        service.type.name = lineVal[1].trim();
+                        break;
+                    }
+                }
+
             }
             services.push(service);
         });
