@@ -119,19 +119,19 @@ exports.config = function(output) {
 };
 
 exports.services = function(output) {
-    return output.split(/\r?\n\r?\n/)
+    var services = output.split(/\r?\n\r?\n/)
         .filter(function(output) { return /SERVICE_NAME/.test(output); })
         .map(function(output) {
             var state = getNumericValue(output, 'STATE', true, 0);
             var service = {
                 name: getValue(output, 'SERVICE_NAME', ''),
                 displayName: getValue(output, 'DISPLAY_NAME', ''),
-                type: { 
-                    code: getNumericValue(output, 'TYPE', true, 0), 
+                type: {
+                    code: getNumericValue(output, 'TYPE', true, 0),
                     name: getCodeNameValue(output, 'TYPE', '')
                 },
-                state: { 
-                    code: state, 
+                state: {
+                    code: state,
                     name: getCodeNameValue(output, 'STATE', ''),
                     running: state === 4,
                     paused: state === 7,
@@ -150,4 +150,55 @@ exports.services = function(output) {
             if (flags) service.flags = flags;
             return service;
         });
+
+    //This code will handle non-english OS's
+    if (services.length === 0){
+        services = [];
+        output =  output.split(/\r?\n\r?\n/).filter(function(output) { return /PID/.test(output); });
+        output.forEach(function(out) {
+            var service = {};
+            var pid = 0;
+            var outLines = out.split('\n');
+            if (outLines.length > 0) {
+                var line = outLines[0].split(":");
+                service.name = line[1].trim();
+            }
+            if (outLines.length > 1){
+                var line = outLines[1].split(":");
+                var lineVal = line[1].split(" ");
+                for (var i = 0 ; i < lineVal.length ; i++){
+                    if (lineVal[i].trim().length === 0){
+                        lineVal.splice(i, 1);
+                    }
+                }
+                service.type =  {};
+                service.type.code = lineVal[0].trim();
+                service.type.name = lineVal[1].trim();
+            }
+            if (outLines.length > 2){
+                var line = outLines[2].split(":");
+                var lineVal = line[1].split(" ");
+                for (var i = 0 ; i < lineVal.length ; i++){
+                    if (lineVal[i].trim().length === 0){
+                        lineVal.splice(i, 1);
+                    }
+                }
+                service.state =  {};
+                service.state.code = lineVal[0].trim();
+                service.state.name = lineVal[1].trim();
+                service.state.running =  service.state.code === '4';
+                service.state.paused =  service.state.code === '7';
+                service.state.stopped =  service.state.code === '1';
+            }
+            for(var line in outLines) {
+                var l = line.split(":");
+                if (l.length > 0 && l[0].toLowerCase() === 'PID') {
+                    pid = l[1].trim();
+                    break;
+                }
+            }
+            services.push(service);
+        });
+    }
+    return services;
 };
