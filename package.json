@@ -1,7 +1,7 @@
 {
   "name": "windows-service-controller",
-  "version": "0.1.5",
-  "description": "Windows service controller.",
+  "version": "0.1.6",
+  "description": "Windows service controller.This can now handle non-english locale",
   "homepage": "https://github.com/mikeobrien/node-windows-service-controller",
   "main": "src/sc.js",
   "bugs": {
