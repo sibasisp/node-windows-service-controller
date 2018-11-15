@@ -13,35 +13,35 @@ function matchGroupOrDefault(source, regex, defaultValue) {
 }
 
 function getValue(source, name, defaultValue) {
-    return matchGroupOrDefault(source, 
+    return matchGroupOrDefault(source,
         getNameValueRegex(name, '(.*)'), defaultValue);
 }
 
 function getCodeNameValue(source, name, defaultValue) {
-    return matchGroupOrDefault(source, 
+    return matchGroupOrDefault(source,
         getNameValueRegex(name, '\\s*\\d*\\s*(.*)'), defaultValue);
 }
 
 function getFlags(source, name) {
-    return matchGroupOrDefault(source, 
+    return matchGroupOrDefault(source,
         new RegExp(escapeRegex(name) + '\\s*:\\s.*\\s*\\((.*)\\)'));
 }
 
 function getArrayValue(source, name) {
-    source = matchGroupOrDefault(source, 
+    source = matchGroupOrDefault(source,
         new RegExp(escapeRegex(name) + '((\\s*:.*)*)'));
     if (!source) return [];
     var regex = /\s*:\s*(.*)/g;
     var results = [];
     var match;
     while (match = regex.exec(source)) {
-        if (match[1]) results.push(match[1]); 
+        if (match[1]) results.push(match[1]);
     }
     return results;
 }
 
 function getNumericValue(source, name, hex, defaultValue) {
-    var value = matchGroupOrDefault(source, 
+    var value = matchGroupOrDefault(source,
         getNameValueRegex(name, '\\s*((0x)?\\d*)'), defaultValue);
     if (hex && !_.startsWith('0x')) value = '0x' + value;
     return parseInt(value);
@@ -52,13 +52,13 @@ function getHexValue(source, name, defaultValue) {
 }
 
 function getBooleanValue(source, name, defaultValue) {
-    return Boolean(matchGroupOrDefault(source, 
+    return Boolean(matchGroupOrDefault(source,
         getNameValueRegex(name, '\\s*(true|false)', 'i'), defaultValue));
 }
 
 exports.error = function(output) {
     var result = getValue(output, 'ERROR') ||
-                 matchGroupOrDefault(output, /^\[SC\].*\s*(.*)/);
+        matchGroupOrDefault(output, /^\[SC\].*\s*(.*)/);
     return result || output;
 };
 
@@ -97,16 +97,16 @@ exports.failureConfig = function(output) {
 
 exports.config = function(output) {
     return {
-        type: { 
-            code: getNumericValue(output, 'TYPE', true, 0), 
+        type: {
+            code: getNumericValue(output, 'TYPE', true, 0),
             name: getCodeNameValue(output, 'TYPE', '')
         },
-        startType: { 
-            code: getNumericValue(output, 'START_TYPE', true, 0), 
+        startType: {
+            code: getNumericValue(output, 'START_TYPE', true, 0),
             name: getCodeNameValue(output, 'START_TYPE', '')
         },
-        errorControl: { 
-            code: getNumericValue(output, 'ERROR_CONTROL', true, 0), 
+        errorControl: {
+            code: getNumericValue(output, 'ERROR_CONTROL', true, 0),
             name: getCodeNameValue(output, 'ERROR_CONTROL', '')
         },
         binPath: getValue(output, 'BINARY_PATH_NAME', ''),
@@ -151,28 +151,35 @@ exports.services = function(output) {
             return service;
         });
 
+    //var services = [];
+
     //This code will handle non-english OS's
     var types = ["KERNEL_DRIVER", "FILE_SYSTEM_DRIVER", "WIN32_OWN_PROCESS", "WIN32_SHARE_PROCESS", "INTERACTIVE_PROCESS"];
     var states = ["STOPPED", "START_PENDING", "STOP_PENDING", "RUNNING", "CONTINUE_PENDING", "PAUSE_PENDING", "PAUSED"];
     if (services.length === 0){
         services = [];
-        output =  output.split(/\r?\n\r?\n/).filter(function(output) { return /PID/.test(output); });
+        output =  output.split(/\r?\n\r?\n/);
         output.forEach(function(out) {
             var service = {};
-            var pid = 0;
             var outLines = out.split('\n');
-            if (outLines.length > 0) {
-                var line = outLines[0].split(":");
-                service.name = line[1].trim();
-            }
-            for(var line in outLines) {
-                var l = line.split(":");
-                if (l.length > 0 && l[0].toLowerCase() === 'PID') {
-                    pid = l[1].trim();
+            var foundName = false;
+            for(var line in  outLines) {
+                line = outLines[line];
+                var l = line.trim().split(":");
+                if (line.trim().length === 0 || line.startsWith("[SC]")){
+                    continue;
+                }
+                if (!foundName) {
+                    service.name = l[1].trim();
+                    foundName = true;
+                }
+                if (l.length > 1 && l[0].trim().toLowerCase() === 'PID'.toLowerCase()) {
+                    service.pid = l[1].trim();
                     break;
                 }
                 for (var type in types){
-                    if (l[1].trim().indexOf(type) !== -1){
+                    type = types[type]
+                    if (l.length > 1 && l[1].trim().indexOf(type) !== -1){
                         var lineVal = l[1].split(" ");
                         for (var i = 0 ; i < lineVal.length ; i++){
                             if (lineVal[i].trim().length === 0){
@@ -186,22 +193,28 @@ exports.services = function(output) {
                     }
                 }
                 for (var state in states){
-                    if (l[1].trim().indexOf(state) !== -1){
+                    state = states[state];
+                    if (l.length > 1 && l[1].trim().indexOf(state) !== -1){
                         var lineVal = l[1].split(" ");
                         for (var i = 0 ; i < lineVal.length ; i++){
                             if (lineVal[i].trim().length === 0){
                                 lineVal.splice(i, 1);
                             }
                         }
-                        service.type =  {};
-                        service.type.code = lineVal[0].trim();
-                        service.type.name = lineVal[1].trim();
+                        service.state =  {};
+                        service.state.code = lineVal[0].trim();
+                        service.state.name = lineVal[1].trim();
+                        service.state.running =  service.state.code === '4';
+                        service.state.paused =  service.state.code === '7';
+                        service.state.stopped =  service.state.code === '1';
                         break;
                     }
                 }
 
             }
-            services.push(service);
+            if (service.name !== undefined && service.name.length > 0) {
+                services.push(service);
+            }
         });
     }
     return services;
